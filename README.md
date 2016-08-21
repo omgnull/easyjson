@@ -4,6 +4,43 @@ easyjson allows to (un-)marshal JSON golang structs without the use of reflectio
 
 One of the aims of the library is to keep generated code simple enough so that it can be easily optimized or fixed. Another goal is to provide users with ability to customize the generated code not available in 'encoding/json', such as generating snake_case names or enabling 'omitempty' behavior by default.
 
+
+## Results of replacement
+
+Old
+```
+BenchmarkEJ_Unmarshal_M-8                          30000             54616 ns/op         238.46 MB/s        9792 B/op        128 allocs/op
+BenchmarkEJ_Unmarshal_S-8                        2000000               706 ns/op         116.00 MB/s         128 B/op          3 allocs/op
+BenchmarkEJ_Marshal_M-8                            50000             26068 ns/op         341.03 MB/s       10366 B/op         10 allocs/op
+BenchmarkEJ_Marshal_L-8                             2000           1198295 ns/op         370.99 MB/s      457725 B/op         31 allocs/op
+BenchmarkEJ_Marshal_L_ToWriter-8                    2000            877294 ns/op         506.74 MB/s        2608 B/op         24 allocs/op
+BenchmarkEJ_Marshal_M_Parallel-8                  100000             12459 ns/op        1045.31 MB/s       10489 B/op          9 allocs/op
+BenchmarkEJ_Marshal_M_ToWriter-8                  100000             18718 ns/op         474.92 MB/s         742 B/op          8 allocs/op
+BenchmarkEJ_Marshal_M_ToWriter_Parallel-8         300000              4818 ns/op        1844.81 MB/s         757 B/op          8 allocs/op
+BenchmarkEJ_Marshal_L_Parallel-8                    2000            640716 ns/op         693.85 MB/s      535514 B/op         36 allocs/op
+BenchmarkEJ_Marshal_L_ToWriter_Parallel-8          10000            199177 ns/op        2231.98 MB/s        4424 B/op         24 allocs/op
+BenchmarkEJ_Marshal_S-8                          5000000               396 ns/op         204.21 MB/s         128 B/op          1 allocs/op
+BenchmarkEJ_Marshal_S_Parallel-8                10000000               167 ns/op         484.20 MB/s         128 B/op          1 allocs/op
+
+```
+
+New
+```
+BenchmarkEJ_Unmarshal_M-8                          30000             57172 ns/op         227.80 MB/s        9792 B/op        128 allocs/op
+BenchmarkEJ_Unmarshal_S-8                        2000000               724 ns/op         113.23 MB/s         128 B/op          3 allocs/op
+BenchmarkEJ_Marshal_M-8                           100000             19206 ns/op         462.86 MB/s           0 B/op          0 allocs/op
+BenchmarkEJ_Marshal_L-8                             2000            972861 ns/op         456.96 MB/s        1159 B/op          0 allocs/op
+BenchmarkEJ_Marshal_L_ToWriter-8                    2000            984923 ns/op         451.37 MB/s        1159 B/op          0 allocs/op
+BenchmarkEJ_Marshal_M_Parallel-8                  300000              4202 ns/op        3099.08 MB/s           1 B/op          0 allocs/op
+BenchmarkEJ_Marshal_M_ToWriter-8                  100000             19513 ns/op         455.59 MB/s           0 B/op          0 allocs/op
+BenchmarkEJ_Marshal_M_ToWriter_Parallel-8         300000              3970 ns/op        2238.88 MB/s           1 B/op          0 allocs/op
+BenchmarkEJ_Marshal_L_Parallel-8                    5000            204074 ns/op        2178.42 MB/s        3706 B/op          0 allocs/op
+BenchmarkEJ_Marshal_L_ToWriter_Parallel-8          10000            199287 ns/op        2230.74 MB/s        1853 B/op          0 allocs/op
+BenchmarkEJ_Marshal_S-8                         10000000               192 ns/op         421.87 MB/s           0 B/op          0 allocs/op
+BenchmarkEJ_Marshal_S_Parallel-8                30000000                48.9 ns/op      1658.00 MB/s           0 B/op          0 allocs/op
+
+```
+
 ## usage
 ```
 go get github.com/mailru/easyjson/...

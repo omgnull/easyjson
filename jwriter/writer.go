@@ -5,24 +5,42 @@ import (
 	"io"
 	"strconv"
 	"unicode/utf8"
+	"sync"
 
-	"github.com/mailru/easyjson/buffer"
+	bbp "github.com/valyala/bytebufferpool"
+)
+
+var (
+	wPool = &sync.Pool{
+		New: func() interface{} {
+			return &Writer{nil, bbp.Get()}
+		},
+	}
 )
 
 // Writer is a JSON writer.
 type Writer struct {
 	Error  error
-	Buffer buffer.Buffer
+	Buffer *bbp.ByteBuffer
+}
+
+func New() *Writer {
+	return wPool.Get().(*Writer)
+}
+
+func Free(w *Writer) {
+	w.Buffer.Reset()
+	wPool.Put(w)
 }
 
 // Size returns the size of the data that was written out.
 func (w *Writer) Size() int {
-	return w.Buffer.Size()
+	return w.Buffer.Len()
 }
 
 // DumpTo outputs the data to given io.Writer, resetting the buffer.
-func (w *Writer) DumpTo(out io.Writer) (written int, err error) {
-	return w.Buffer.DumpTo(out)
+func (w *Writer) DumpTo(out io.Writer) (written int64, err error) {
+	return w.Buffer.WriteTo(out)
 }
 
 // BuildBytes returns writer data as a single byte slice.
@@ -31,17 +49,17 @@ func (w *Writer) BuildBytes() ([]byte, error) {
 		return nil, w.Error
 	}
 
-	return w.Buffer.BuildBytes(), nil
+	return w.Buffer.Bytes(), nil
 }
 
 // RawByte appends raw binary data to the buffer.
 func (w *Writer) RawByte(c byte) {
-	w.Buffer.AppendByte(c)
+	w.Buffer.WriteByte(c)
 }
 
 // RawByte appends raw binary data to the buffer.
 func (w *Writer) RawString(s string) {
-	w.Buffer.AppendString(s)
+	w.Buffer.WriteString(s)
 }
 
 // RawByte appends raw binary data to the buffer or sets the error if it is given. Useful for
@@ -53,148 +71,125 @@ func (w *Writer) Raw(data []byte, err error) {
 	case err != nil:
 		w.Error = err
 	case len(data) > 0:
-		w.Buffer.AppendBytes(data)
+		w.Buffer.Write(data)
 	default:
 		w.RawString("null")
 	}
 }
 
 func (w *Writer) Uint8(n uint8) {
-	w.Buffer.EnsureSpace(3)
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
+	w.Buffer.B = strconv.AppendUint(w.Buffer.B, uint64(n), 10)
 }
 
 func (w *Writer) Uint16(n uint16) {
-	w.Buffer.EnsureSpace(5)
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
+	w.Buffer.B = strconv.AppendUint(w.Buffer.B, uint64(n), 10)
 }
 
 func (w *Writer) Uint32(n uint32) {
-	w.Buffer.EnsureSpace(10)
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
+	w.Buffer.B = strconv.AppendUint(w.Buffer.B, uint64(n), 10)
 }
 
 func (w *Writer) Uint(n uint) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
+	w.Buffer.B = strconv.AppendUint(w.Buffer.B, uint64(n), 10)
 }
 
 func (w *Writer) Uint64(n uint64) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, n, 10)
+	w.Buffer.B = strconv.AppendUint(w.Buffer.B, n, 10)
 }
 
 func (w *Writer) Int8(n int8) {
-	w.Buffer.EnsureSpace(4)
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
+	w.Buffer.B = strconv.AppendInt(w.Buffer.B, int64(n), 10)
 }
 
 func (w *Writer) Int16(n int16) {
-	w.Buffer.EnsureSpace(6)
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
+	w.Buffer.B = strconv.AppendInt(w.Buffer.B, int64(n), 10)
 }
 
 func (w *Writer) Int32(n int32) {
-	w.Buffer.EnsureSpace(11)
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
+	w.Buffer.B = strconv.AppendInt(w.Buffer.B, int64(n), 10)
 }
 
 func (w *Writer) Int(n int) {
-	w.Buffer.EnsureSpace(21)
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
+	w.Buffer.B = strconv.AppendInt(w.Buffer.B, int64(n), 10)
 }
 
 func (w *Writer) Int64(n int64) {
-	w.Buffer.EnsureSpace(21)
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, n, 10)
+	w.Buffer.B = strconv.AppendInt(w.Buffer.B, n, 10)
 }
 
 func (w *Writer) Uint8Str(n uint8) {
-	w.Buffer.EnsureSpace(3)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Uint8(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Uint16Str(n uint16) {
-	w.Buffer.EnsureSpace(5)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Uint16(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Uint32Str(n uint32) {
-	w.Buffer.EnsureSpace(10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Uint32(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) UintStr(n uint) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, uint64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Uint(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Uint64Str(n uint64) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendUint(w.Buffer.Buf, n, 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Uint64(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Int8Str(n int8) {
-	w.Buffer.EnsureSpace(4)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Int8(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Int16Str(n int16) {
-	w.Buffer.EnsureSpace(6)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Int16(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Int32Str(n int32) {
-	w.Buffer.EnsureSpace(11)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Int32(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) IntStr(n int) {
-	w.Buffer.EnsureSpace(21)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, int64(n), 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Int(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Int64Str(n int64) {
-	w.Buffer.EnsureSpace(21)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
-	w.Buffer.Buf = strconv.AppendInt(w.Buffer.Buf, n, 10)
-	w.Buffer.Buf = append(w.Buffer.Buf, '"')
+	w.Buffer.WriteByte('"')
+	w.Int64(n)
+	w.Buffer.WriteByte('"')
 }
 
 func (w *Writer) Float32(n float32) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, float64(n), 'g', -1, 32)
+	w.Buffer.B = strconv.AppendFloat(w.Buffer.B, float64(n), 'g', -1, 32)
 }
 
 func (w *Writer) Float64(n float64) {
-	w.Buffer.EnsureSpace(20)
-	w.Buffer.Buf = strconv.AppendFloat(w.Buffer.Buf, n, 'g', -1, 64)
+	w.Buffer.B = strconv.AppendFloat(w.Buffer.B, n, 'g', -1, 64)
 }
 
 func (w *Writer) Bool(v bool) {
-	w.Buffer.EnsureSpace(5)
 	if v {
-		w.Buffer.Buf = append(w.Buffer.Buf, "true"...)
+		w.Buffer.WriteString("true")
 	} else {
-		w.Buffer.Buf = append(w.Buffer.Buf, "false"...)
+		w.Buffer.WriteString("false")
 	}
 }
 
@@ -207,7 +202,7 @@ func isNotEscapedSingleChar(c byte) bool {
 }
 
 func (w *Writer) String(s string) {
-	w.Buffer.AppendByte('"')
+	w.Buffer.WriteByte('"')
 
 	// Portions of the string that contain no escapes are appended as
 	// byte slices.
@@ -223,22 +218,22 @@ func (w *Writer) String(s string) {
 			continue
 		} else if c < utf8.RuneSelf {
 			// single-with character, need to escape
-			w.Buffer.AppendString(s[p:i])
+			w.Buffer.WriteString(s[p:i])
 			switch c {
 			case '\t':
-				w.Buffer.AppendString(`\t`)
+				w.Buffer.WriteString(`\t`)
 			case '\r':
-				w.Buffer.AppendString(`\r`)
+				w.Buffer.WriteString(`\r`)
 			case '\n':
-				w.Buffer.AppendString(`\n`)
+				w.Buffer.WriteString(`\n`)
 			case '\\':
-				w.Buffer.AppendString(`\\`)
+				w.Buffer.WriteString(`\\`)
 			case '"':
-				w.Buffer.AppendString(`\"`)
+				w.Buffer.WriteString(`\"`)
 			default:
-				w.Buffer.AppendString(`\u00`)
-				w.Buffer.AppendByte(chars[c>>4])
-				w.Buffer.AppendByte(chars[c&0xf])
+				w.Buffer.WriteString(`\u00`)
+				w.Buffer.WriteByte(chars[c>>4])
+				w.Buffer.WriteByte(chars[c&0xf])
 			}
 
 			i++
@@ -249,8 +244,8 @@ func (w *Writer) String(s string) {
 		// broken utf
 		runeValue, runeWidth := utf8.DecodeRuneInString(s[i:])
 		if runeValue == utf8.RuneError && runeWidth == 1 {
-			w.Buffer.AppendString(s[p:i])
-			w.Buffer.AppendString(`\ufffd`)
+			w.Buffer.WriteString(s[p:i])
+			w.Buffer.WriteString(`\ufffd`)
 			i++
 			p = i
 			continue
@@ -258,15 +253,15 @@ func (w *Writer) String(s string) {
 
 		// jsonp stuff - tab separator and line separator
 		if runeValue == '\u2028' || runeValue == '\u2029' {
-			w.Buffer.AppendString(s[p:i])
-			w.Buffer.AppendString(`\u202`)
-			w.Buffer.AppendByte(chars[runeValue&0xf])
+			w.Buffer.WriteString(s[p:i])
+			w.Buffer.WriteString(`\u202`)
+			w.Buffer.WriteByte(chars[runeValue&0xf])
 			i += runeWidth
 			p = i
 			continue
 		}
 		i += runeWidth
 	}
-	w.Buffer.AppendString(s[p:])
-	w.Buffer.AppendByte('"')
+	w.Buffer.WriteString(s[p:])
+	w.Buffer.WriteByte('"')
 }

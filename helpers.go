@@ -28,26 +28,30 @@ type Optional interface {
 
 // Marshal returns data as a single byte slice. Method is suboptimal as the data is likely to be copied
 // from a chain of smaller chunks.
-func Marshal(v Marshaler) ([]byte, error) {
-	w := jwriter.Writer{}
-	v.MarshalEasyJSON(&w)
-	return w.BuildBytes()
+func Marshal(v Marshaler) (b []byte, err error) {
+	jw := jwriter.New()
+	v.MarshalEasyJSON(jw)
+	b, err = jw.BuildBytes()
+	jwriter.Free(jw)
+	return
 }
 
 // MarshalToWriter marshals the data to an io.Writer.
-func MarshalToWriter(v Marshaler, w io.Writer) (written int, err error) {
-	jw := jwriter.Writer{}
-	v.MarshalEasyJSON(&jw)
-	return jw.DumpTo(w)
+func MarshalToWriter(v Marshaler, w io.Writer) (written int64, err error) {
+	jw := jwriter.New()
+	v.MarshalEasyJSON(jw)
+	written, err = jw.DumpTo(w)
+	jwriter.Free(jw)
+	return
 }
 
 // MarshalToHTTPResponseWriter sets Content-Length and Content-Type headers for the
 // http.ResponseWriter, and send the data to the writer. started will be equal to
 // false if an error occurred before any http.ResponseWriter methods were actually
 // invoked (in this case a 500 reply is possible).
-func MarshalToHTTPResponseWriter(v Marshaler, w http.ResponseWriter) (started bool, written int, err error) {
-	jw := jwriter.Writer{}
-	v.MarshalEasyJSON(&jw)
+func MarshalToHTTPResponseWriter(v Marshaler, w http.ResponseWriter) (started bool, written int64, err error) {
+	jw := jwriter.New()
+	v.MarshalEasyJSON(jw)
 	if jw.Error != nil {
 		return false, 0, jw.Error
 	}
@@ -56,6 +60,7 @@ func MarshalToHTTPResponseWriter(v Marshaler, w http.ResponseWriter) (started bo
 
 	started = true
 	written, err = jw.DumpTo(w)
+	jwriter.Free(jw)
 	return
 }
 

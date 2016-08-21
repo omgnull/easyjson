@@ -60,18 +60,20 @@ func BenchmarkEJ_Marshal_L_ToWriter(b *testing.B) {
 	var l int64
 	out := &DummyWriter{}
 	for i := 0; i < b.N; i++ {
-		w := jwriter.Writer{}
-		xlStructData.MarshalEasyJSON(&w)
+		w := jwriter.New()
+		xlStructData.MarshalEasyJSON(w)
 		if w.Error != nil {
 			b.Error(w.Error)
 		}
 
 		l = int64(w.Size())
 		w.DumpTo(out)
+		jwriter.Free(w)
 	}
 	b.SetBytes(l)
 
 }
+
 func BenchmarkEJ_Marshal_M_Parallel(b *testing.B) {
 	b.SetBytes(int64(len(largeStructText)))
 
@@ -89,14 +91,15 @@ func BenchmarkEJ_Marshal_M_ToWriter(b *testing.B) {
 	var l int64
 	out := &DummyWriter{}
 	for i := 0; i < b.N; i++ {
-		w := jwriter.Writer{}
-		largeStructData.MarshalEasyJSON(&w)
+		w := jwriter.New()
+		largeStructData.MarshalEasyJSON(w)
 		if w.Error != nil {
 			b.Error(w.Error)
 		}
 
 		l = int64(w.Size())
 		w.DumpTo(out)
+		jwriter.Free(w)
 	}
 	b.SetBytes(l)
 
@@ -107,14 +110,15 @@ func BenchmarkEJ_Marshal_M_ToWriter_Parallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		var l int64
 		for pb.Next() {
-			w := jwriter.Writer{}
-			largeStructData.MarshalEasyJSON(&w)
+			w := jwriter.New()
+			largeStructData.MarshalEasyJSON(w)
 			if w.Error != nil {
 				b.Error(w.Error)
 			}
 
 			l = int64(w.Size())
 			w.DumpTo(out)
+			jwriter.Free(w)
 		}
 		if l > 0 {
 			b.SetBytes(l)
@@ -142,14 +146,15 @@ func BenchmarkEJ_Marshal_L_ToWriter_Parallel(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		var l int64
 		for pb.Next() {
-			w := jwriter.Writer{}
+			w := jwriter.New()
 
-			xlStructData.MarshalEasyJSON(&w)
+			xlStructData.MarshalEasyJSON(w)
 			if w.Error != nil {
 				b.Error(w.Error)
 			}
 			l = int64(w.Size())
 			w.DumpTo(out)
+			jwriter.Free(w)
 		}
 		if l > 0 {
 			b.SetBytes(l)

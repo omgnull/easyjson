@@ -123,11 +123,12 @@ var testSpecialCases = []struct {
 
 func TestSpecialCases(t *testing.T) {
 	for i, test := range testSpecialCases {
-		w := jwriter.Writer{}
+		w := jwriter.New()
 		w.String(test.Value)
-		got := string(w.Buffer.BuildBytes())
+		got := string(w.Buffer.Bytes())
 		if got != test.EncodedString {
 			t.Errorf("[%d] Encoded() = %+v; want %+v", i, got, test.EncodedString)
 		}
+		jwriter.Free(w)
 	}
 }
